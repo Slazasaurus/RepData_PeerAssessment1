@@ -1,0 +1,57 @@
+Wearable Fitness Analysis Reproducibility Project
+========================================================
+
+In this document we do some prelimiary and basic analyses on the activity data under the assumption that the data is in the present working directory. We use the plyr library to clean and manipulate data. We throw away all intervals with missing step counts out at the outset, for simplicity's sake.
+
+```{r Initial Set Up and Dealing with Missing Data }
+library(plyr)
+data <- read.csv('activity.csv')
+no_na <- data[!is.na(data$steps),]
+```
+
+We sum the steps over the date fields for those which have no na values.
+```{r Getting the Steps per Day}
+per_dia <- ddply(no_na, .(date), summarize, pd = sum(steps))
+head(per_dia)
+```
+Calculations for mean and median steps per day:
+```{r Mean and Median Steps per Day}
+mean(per_dia$pd)
+median(per_dia$pd)
+```
+
+Histogram of step data, and log(step + 1) per day:
+```{r Histograms of Steps per Day}
+hist(per_dia$pd, xlab="Steps per Day", main="Steps per Day")
+hist(log(per_dia$pd + 1), xlab="Log of Steps per Day", main="Log of Steps per Day")
+```
+
+Time series plot of average steps, and code for creating these averages:
+```{r Daily Averages Plotted by Day}
+day_averages <- ddply(no_na, .(date), summarize, av = mean(steps))
+plot(av ~ date, day_averages)
+lines(day_averages$date, day_averages$av, type="c")
+```
+
+Code for finding the five minute interval that on average contains the maximum number of steps. Also creates plot for this data. Interval with highest average is the 835th.
+```{r Highest Average Interval}
+interval_averages <- ddply(no_na, .(interval), summarize, av = mean(steps))
+interval_averages[interval_averages$av == max(interval_averages$av),]$interval
+```
+```{r Plot of Interval Averages}
+plot(av ~ interval, data=interval_averages)
+with(interval_averages, lines(interval, av, type="c"))
+```
+
+In order to represent missing data we will fill in with the average for that interval over all days. This is at least somewhat legitimate since the average should represent the _typical_ behavior for a given interval on any given day. We then generate a histogram of steps per day for this new set.
+```{r Imputing Missing Data}
+imputed <- data
+imputed[is.na(data$steps),]$steps = interval_averages$av
+imputed_per_dia <- ddply(imputed, .(date), summarize, pd=sum(steps))
+#We test that it really is full now
+imputed_per_dia[is.na(imputed_per_dia$steps),]
+hist(imputed_per_dia$pd, xlab="Steps per Day", main = "Steps per Day (Imputed)")
+hist(log(imputed_per_dia$pd + 1), xlab="Log of Steps per Day", main="Log of Steps per Day (Imputed)")
+```
+
+Lastly, we generate a panel plot comparing average number of steps taken per 5-minute interval across weekdays and weekends.
